@@ -207,8 +207,8 @@ if __name__ == '__main__':
     input_dir = "./" ### モザイクアートに使う写真が格納されているディレクトリを指定
     target_image_path = "./001.png" ### モザイクアートで作りたい画像のパスを指定
 
-    mode = "LAB" ### 利用する比較モードを指定
-    n_div = 50 ### 作りたい画像の各辺を何分割するかを指定(n_div * n_div枚をモザイクアートで使うことになる)
+    mode = "LAB2" ### 利用する比較モードを指定
+    n_div = 40 ### 作りたい画像の各辺を何分割するかを指定(n_div * n_div枚をモザイクアートで使うことになる)
     piece_scale = 1 / 20 ### モザイクアートに並べる画像のサイズの倍率を指定
 
     mosaic(input_dir, target_image_path, mode=mode, n_div=n_div, piece_scale=piece_scale)

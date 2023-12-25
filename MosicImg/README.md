@@ -6,7 +6,7 @@ Python script (`MosaicImg.py`) for creating mosaic art from a target image using
 
 This script creates mosaic art by arranging and adjusting a collection of source images to match a target image. The comparison is done based on color spaces (HSV, Hue, LAB) to find the best-matching pieces.
 
-![concat_img_ref.jpg](concat_img_ref.jpg)
+![mosic_generation_process_ref.gif](mosic_generation_process_ref.gif)
 
 ## Usage
 

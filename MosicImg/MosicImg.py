@@ -16,6 +16,7 @@ import random
 import cv2
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import math
 
 # タイル画像の基準とする画像サイズ
 HEIGHT = 512
@@ -86,36 +87,106 @@ def show_img(img):
     plt.show()
 
 
+def paste_image_on_canvas(canvas_size, paste_image):
+    canvas = np.ones((canvas_size[1], canvas_size[0], 3), dtype=np.uint8) * 255
+
+    # 画像がキャンバスより小さい場合の余白計算
+    y_offset = (canvas_size[1] - paste_image.shape[0]) // 2
+    x_offset = (canvas_size[0] - paste_image.shape[1]) // 2
+
+    # 画像を中央に貼り付け
+    canvas[y_offset:y_offset + paste_image.shape[0], x_offset:x_offset + paste_image.shape[1]] = paste_image
+
+    return canvas
+
+
 # 画像群をくっつけて表示
-def concat_tile_image(image_list, n_row=10, n_col=10, scale=1.0):
+def concat_tile_image(image_list, target_image_path, n_row=10, n_col=10, scale=1.0, create_video=True):
 
     height = int(HEIGHT * scale)
     width = int(WIDTH * scale)
     concat_list = []
+    canvas_size = (1080,1080)
+
+    # Define video writer if create_video is True
+    if create_video:
+        output_file = "mosic_generation_process.mov"  # 保存する動画ファイル名
+        fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
+        fps = int(math.ceil(len(image_list) / 5))
+        # Ensure fps is within the specified range [1, 24]
+        fps = max(1, min(24, fps))
+        print("fps=",fps)
+        video_output = cv2.VideoWriter(output_file, fourcc, fps, (1080, 1080))
 
     for idx, image in enumerate(image_list):
         if idx % n_col == 0:
             row_list = [image]
+            #show_img(np.hstack(row_list)) #左端のタイル
+            # if create_video:
+            #     print("Write Video Frame idx:",idx)
+            #     frame = paste_image_on_canvas(canvas_size, np.hstack(row_list))
+            #     video_output.write(frame)
         else:
             row_list = row_list + [image]
+            #show_img(np.hstack(row_list)) #左端から積まれていくタイル
+            # if create_video:
+            #     print("Write Video Frame idx:",idx)
+            #     frame = paste_image_on_canvas(canvas_size, np.hstack(row_list))
+            #     video_output.write(frame)
             if idx % n_col == (n_col -1):
                 row_img = np.hstack(row_list)
                 concat_list = concat_list +[row_img]
+                #show_img(np.vstack(concat_list)) #縦に積まれたタイル
+                if create_video:
+                    print("Write Video Frame idx:",idx)
+                    frame = paste_image_on_canvas(canvas_size, np.vstack(concat_list))
+                    for _ in range(7):#7フレーム繰り返し書いて映像を止める
+                        video_output.write(frame)
         if idx == len(image_list) - 1:
             if idx % n_col < n_col -1:
                 n_blank = n_col - (len(image_list) % n_col)
                 row_list = row_list + [np.zeros( (width, height, 3) )] * n_blank
                 row_img = np.hstack(row_list)
-                concat_list = concat_list + [row_img]            
+                concat_list = concat_list + [row_img]
         if idx >= n_row * n_col:
             break
+
+    #最終タイル画像の生成
     concat_img = np.vstack(concat_list)
+    
+    if create_video:
+        print("Write Last Video Frame idx:",idx)
+
+        # #白画像を挟んでフラッシュ効果を表示
+        # canvas = np.ones((canvas_size[1], canvas_size[0], 3), dtype=np.uint8) * 255
+        # frame = paste_image_on_canvas(canvas_size, canvas)
+        # for _ in range(6):#6フレーム繰り返し書いて映像を止める
+        #     video_output.write(frame)
+
+        #完成したモザイク画像を動画に表示
+        frame = paste_image_on_canvas(canvas_size, concat_img)
+        for _ in range(72):#72フレーム繰り返し書いて映像を止める
+            video_output.write(frame)
+        
+        #モザイク前の目標画像を動画に表示
+        target_image = cv2.imread(target_image_path)
+        target_image = cv2.resize(target_image, (concat_img.shape[1], concat_img.shape[0]))
+        frame = paste_image_on_canvas(canvas_size, target_image)
+        for _ in range(24):#24フレーム繰り返し書いて映像を止める
+            video_output.write(frame)
 
     # 画像を表示
     show_img(concat_img)
 
+    # 画像を保存する
     resized_image = cv2.resize(concat_img, (1080, 1080))
     cv2.imwrite('concat_img.jpg', resized_image)
+
+    # Release the video writer if create_video is True
+    if create_video:
+        video_output.release()
+    
+    return
 
 def mosaic(input_dir, target_image_path, mode="LAB2", n_div=110, piece_scale=1/40):
 
@@ -201,14 +272,14 @@ def mosaic(input_dir, target_image_path, mode="LAB2", n_div=110, piece_scale=1/4
     
     "[7] くっつけて一つのモザイクアートにする"
     # 並べ替えたピースを一つの画像にくっつけて表示
-    concat_tile_image(mosaic_list_sorted, n_col=n_col, n_row=n_row, scale=piece_scale)
+    concat_tile_image(mosaic_list_sorted, target_image_path, n_col=n_col, n_row=n_row, scale=piece_scale)
 
 if __name__ == '__main__':
     input_dir = "./" ### モザイクアートに使う写真が格納されているディレクトリを指定
     target_image_path = "./001.png" ### モザイクアートで作りたい画像のパスを指定
 
     mode = "LAB2" ### 利用する比較モードを指定
-    n_div = 40 ### 作りたい画像の各辺を何分割するかを指定(n_div * n_div枚をモザイクアートで使うことになる)
-    piece_scale = 1 / 20 ### モザイクアートに並べる画像のサイズの倍率を指定
+    n_div = 36 ### 作りたい画像の各辺を何分割するかを指定(n_div * n_div枚をモザイクアートで使うことになる)
+    piece_scale = 1 / 18 ### モザイクアートに並べる画像のサイズの倍率を指定
 
     mosaic(input_dir, target_image_path, mode=mode, n_div=n_div, piece_scale=piece_scale)

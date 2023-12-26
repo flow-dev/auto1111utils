@@ -176,6 +176,17 @@ def concat_tile_image(image_list, target_image_path, source_piece_num, n_row=10,
         
         #モザイク前の目標画像を動画に表示
         target_image = cv2.imread(target_image_path)
+        height = int(target_image.shape[0])
+        width = int(target_image.shape[1])
+        # 正方形でない場合は中央をCropする
+        if(width != height):
+            min_dim = min(width, height)
+            print("Crop the target image from center=", target_image_path)
+            left = (width - min_dim) // 2
+            top = (height - min_dim) // 2
+            right = (width + min_dim) // 2
+            bottom = (height + min_dim) // 2
+            target_image = target_image[top:bottom, left:right]
         target_image = cv2.resize(target_image, (concat_img.shape[1], concat_img.shape[0]))
         frame = paste_image_on_canvas(canvas_size, target_image)
         for _ in range(72):#72フレーム繰り返し書いて映像を止める
@@ -286,10 +297,10 @@ def mosaic(input_dir, target_image_path, mode="LAB2", n_div=110, piece_scale=1/4
 
 if __name__ == '__main__':
     input_dir = "./" ### モザイクアートに使う写真が格納されているディレクトリを指定
-    target_image_path = "./traffic_mosic_art.png" ### モザイクアートで作りたい画像のパスを指定
+    target_image_path = "./Kamirarimon.jpg" ### モザイクアートで作りたい画像のパスを指定
 
     mode = "LAB" ### 利用する比較モードを指定
-    n_div = 50 ### 作りたい画像の各辺を何分割するかを指定(n_div * n_div枚をモザイクアートで使うことになる)
-    piece_scale = 1 / 25 ### モザイクアートに並べる画像のサイズの倍率を指定
+    n_div = 64 ### 作りたい画像の各辺を何分割するかを指定(n_div * n_div枚をモザイクアートで使うことになる)
+    piece_scale = 1 / 32 ### モザイクアートに並べる画像のサイズの倍率を指定
 
     mosaic(input_dir, target_image_path, mode=mode, n_div=n_div, piece_scale=piece_scale)

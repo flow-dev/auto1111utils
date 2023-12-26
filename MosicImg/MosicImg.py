@@ -17,6 +17,7 @@ import cv2
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import math
+from datetime import datetime
 
 # タイル画像の基準とする画像サイズ
 HEIGHT = 512
@@ -101,16 +102,21 @@ def paste_image_on_canvas(canvas_size, paste_image):
 
 
 # 画像群をくっつけて表示
-def concat_tile_image(image_list, target_image_path, n_row=10, n_col=10, scale=1.0, create_video=True):
+def concat_tile_image(image_list, target_image_path, source_piece_num, n_row=10, n_col=10, scale=1.0, create_video=True):
 
     height = int(HEIGHT * scale)
     width = int(WIDTH * scale)
     concat_list = []
     canvas_size = (1080,1080)
-
+    
+    # Get timestamp
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    # Target Image Filename
+    target_img_filename, extension = os.path.splitext(os.path.basename(target_image_path))
+    
     # Define video writer if create_video is True
     if create_video:
-        output_file = "mosic_generation_process.mov"  # 保存する動画ファイル名
+        output_file = f"mosic_process_{timestamp}_{target_img_filename}_{str(source_piece_num)}_tiles.mov" # 保存する動画ファイル名
         fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
         fps = int(math.ceil(len(image_list) / 5))
         # Ensure fps is within the specified range [1, 24]
@@ -172,7 +178,7 @@ def concat_tile_image(image_list, target_image_path, n_row=10, n_col=10, scale=1
         target_image = cv2.imread(target_image_path)
         target_image = cv2.resize(target_image, (concat_img.shape[1], concat_img.shape[0]))
         frame = paste_image_on_canvas(canvas_size, target_image)
-        for _ in range(24):#24フレーム繰り返し書いて映像を止める
+        for _ in range(72):#72フレーム繰り返し書いて映像を止める
             video_output.write(frame)
 
     # 画像を表示
@@ -180,7 +186,8 @@ def concat_tile_image(image_list, target_image_path, n_row=10, n_col=10, scale=1
 
     # 画像を保存する
     resized_image = cv2.resize(concat_img, (1080, 1080))
-    cv2.imwrite('concat_img.jpg', resized_image)
+    concat_img_name = f"concat_img_{timestamp}_{target_img_filename}_{str(source_piece_num)}_tiles.jpg"
+    cv2.imwrite(concat_img_name, resized_image)
 
     # Release the video writer if create_video is True
     if create_video:
@@ -199,6 +206,9 @@ def mosaic(input_dir, target_image_path, mode="LAB2", n_div=110, piece_scale=1/4
     # モザイクアートに使う写真をリサイズして読み込み
     image_names = sorted([f for f in os.listdir(input_dir) if f.endswith((".png", ".jpg"))])
     source_piece_list = [load_images(os.path.join(input_dir, p),scale=piece_scale) for p in tqdm(image_names, desc="[Load source images]")]
+
+    # ソースとなるピース数を保持
+    source_piece_num = len(source_piece_list)
     
     # 比較用にリサイズしたものも準備
     source_eval_piece_list = [cv2.resize(img, (eval_width, eval_height), interpolation=cv2.INTER_AREA) for img in tqdm(source_piece_list,desc="[Resize source images]")]
@@ -272,14 +282,14 @@ def mosaic(input_dir, target_image_path, mode="LAB2", n_div=110, piece_scale=1/4
     
     "[7] くっつけて一つのモザイクアートにする"
     # 並べ替えたピースを一つの画像にくっつけて表示
-    concat_tile_image(mosaic_list_sorted, target_image_path, n_col=n_col, n_row=n_row, scale=piece_scale)
+    concat_tile_image(mosaic_list_sorted, target_image_path, source_piece_num, n_col=n_col, n_row=n_row, scale=piece_scale)
 
 if __name__ == '__main__':
     input_dir = "./" ### モザイクアートに使う写真が格納されているディレクトリを指定
-    target_image_path = "./001.png" ### モザイクアートで作りたい画像のパスを指定
+    target_image_path = "./traffic_mosic_art.png" ### モザイクアートで作りたい画像のパスを指定
 
-    mode = "LAB2" ### 利用する比較モードを指定
-    n_div = 36 ### 作りたい画像の各辺を何分割するかを指定(n_div * n_div枚をモザイクアートで使うことになる)
-    piece_scale = 1 / 18 ### モザイクアートに並べる画像のサイズの倍率を指定
+    mode = "LAB" ### 利用する比較モードを指定
+    n_div = 50 ### 作りたい画像の各辺を何分割するかを指定(n_div * n_div枚をモザイクアートで使うことになる)
+    piece_scale = 1 / 25 ### モザイクアートに並べる画像のサイズの倍率を指定
 
     mosaic(input_dir, target_image_path, mode=mode, n_div=n_div, piece_scale=piece_scale)

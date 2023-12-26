@@ -23,6 +23,9 @@ from datetime import datetime
 HEIGHT = 512
 WIDTH  = 512
 
+# 最終出力のキャンバスサイズ(正方形)
+CANVAS_PIX = 2160
+
 
 # 画像を調整しながら読み込み
 def load_images(image_path, scale=1.0):
@@ -89,7 +92,21 @@ def show_img(img):
 
 
 def paste_image_on_canvas(canvas_size, paste_image):
+
     canvas = np.ones((canvas_size[1], canvas_size[0], 3), dtype=np.uint8) * 255
+
+
+    # 正方形でない場合は中央をCropする
+    height = int(paste_image.shape[0])
+    width = int(paste_image.shape[1])
+    if(width != height):
+        min_dim = min(width, height)
+        left = (width - min_dim) // 2
+        top = (height - min_dim) // 2
+        right = (width + min_dim) // 2
+        bottom = (height + min_dim) // 2
+        paste_image = paste_image[top:bottom, left:right]
+    paste_image = cv2.resize(paste_image, (int(canvas_size[1]), int(canvas_size[0])))
 
     # 画像がキャンバスより小さい場合の余白計算
     y_offset = (canvas_size[1] - paste_image.shape[0]) // 2
@@ -107,7 +124,7 @@ def concat_tile_image(image_list, target_image_path, source_piece_num, n_row=10,
     height = int(HEIGHT * scale)
     width = int(WIDTH * scale)
     concat_list = []
-    canvas_size = (1080,1080)
+    canvas_size = (CANVAS_PIX,CANVAS_PIX)
     
     # Get timestamp
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -122,7 +139,7 @@ def concat_tile_image(image_list, target_image_path, source_piece_num, n_row=10,
         # Ensure fps is within the specified range [1, 24]
         fps = max(1, min(24, fps))
         print("fps=",fps)
-        video_output = cv2.VideoWriter(output_file, fourcc, fps, (1080, 1080))
+        video_output = cv2.VideoWriter(output_file, fourcc, fps, (CANVAS_PIX, CANVAS_PIX))
 
     for idx, image in enumerate(image_list):
         if idx % n_col == 0:
@@ -144,10 +161,13 @@ def concat_tile_image(image_list, target_image_path, source_piece_num, n_row=10,
                 concat_list = concat_list +[row_img]
                 #show_img(np.vstack(concat_list)) #縦に積まれたタイル
                 if create_video:
-                    print("Write Video Frame idx:",idx)
-                    frame = paste_image_on_canvas(canvas_size, np.vstack(concat_list))
-                    for _ in range(7):#7フレーム繰り返し書いて映像を止める
-                        video_output.write(frame)
+                    # 偶数のみフレーム書き出しで拡大表示時の端画像をきれいにする
+                    # 5x5ブロックから表示する制約を入れる。3x3までは拡大のジャギーが目立つため
+                    if((idx % 2 == 0) & (idx >= ((n_col * 5)-1))):
+                        print("Write Video Frame idx:",idx,n_col)
+                        frame = paste_image_on_canvas(canvas_size, np.vstack(concat_list))
+                        for _ in range(7):#7フレーム繰り返し書いて映像を止める
+                            video_output.write(frame)
         if idx == len(image_list) - 1:
             if idx % n_col < n_col -1:
                 n_blank = n_col - (len(image_list) % n_col)
@@ -171,7 +191,7 @@ def concat_tile_image(image_list, target_image_path, source_piece_num, n_row=10,
 
         #完成したモザイク画像を動画に表示
         frame = paste_image_on_canvas(canvas_size, concat_img)
-        for _ in range(72):#72フレーム繰り返し書いて映像を止める
+        for _ in range(96):#96フレーム繰り返し書いて映像を止める
             video_output.write(frame)
         
         #モザイク前の目標画像を動画に表示
@@ -196,7 +216,7 @@ def concat_tile_image(image_list, target_image_path, source_piece_num, n_row=10,
     show_img(concat_img)
 
     # 画像を保存する
-    resized_image = cv2.resize(concat_img, (1080, 1080))
+    resized_image = cv2.resize(concat_img, (CANVAS_PIX, CANVAS_PIX))
     concat_img_name = f"concat_img_{timestamp}_{target_img_filename}_{str(source_piece_num)}_tiles.jpg"
     cv2.imwrite(concat_img_name, resized_image)
 
@@ -297,10 +317,10 @@ def mosaic(input_dir, target_image_path, mode="LAB2", n_div=110, piece_scale=1/4
 
 if __name__ == '__main__':
     input_dir = "./" ### モザイクアートに使う写真が格納されているディレクトリを指定
-    target_image_path = "./Kamirarimon.jpg" ### モザイクアートで作りたい画像のパスを指定
+    target_image_path = "./ColorChecker_All_S-Gamut3.Cine_D50_BT709.png" ### モザイクアートで作りたい画像のパスを指定
 
     mode = "LAB" ### 利用する比較モードを指定
-    n_div = 64 ### 作りたい画像の各辺を何分割するかを指定(n_div * n_div枚をモザイクアートで使うことになる)
-    piece_scale = 1 / 32 ### モザイクアートに並べる画像のサイズの倍率を指定
+    n_div = 63 ### 作りたい画像の各辺を何分割するかを指定(n_div * n_div枚をモザイクアートで使うことになる)
+    piece_scale = 1 / 15 ### モザイクアートに並べる画像のサイズの倍率を指定
 
     mosaic(input_dir, target_image_path, mode=mode, n_div=n_div, piece_scale=piece_scale)

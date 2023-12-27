@@ -86,9 +86,9 @@ def diff_score_hsv(img1, img2, color_coef=np.array([1, 1, 1])):
 # 画像を調整しながら表示
 def show_img(img):
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    plt.imshow(img_rgb)#, cmap = 'gray')
-    #plt.colorbar()
-    plt.show()
+    # plt.imshow(img_rgb)#, cmap = 'gray')
+    # #plt.colorbar()
+    # plt.show()
 
 
 def paste_image_on_canvas(canvas_size, paste_image):
@@ -133,13 +133,27 @@ def concat_tile_image(image_list, target_image_path, source_piece_num, n_row=10,
     
     # Define video writer if create_video is True
     if create_video:
-        output_file = f"mosic_process_{timestamp}_{target_img_filename}_{str(source_piece_num)}_tiles.mov" # 保存する動画ファイル名
+        output_file = f"mosic_process_{timestamp}_{target_img_filename}_{str(source_piece_num)}_tiles.mov" # Video file name for saving
         fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
         fps = int(math.ceil(len(image_list) / 5))
         # Ensure fps is within the specified range [1, 24]
         fps = max(1, min(24, fps))
         print("fps=",fps)
         video_output = cv2.VideoWriter(output_file, fourcc, fps, (CANVAS_PIX, CANVAS_PIX))
+        # Display text on the first frame
+        image_char = np.ones((CANVAS_PIX, CANVAS_PIX, 3), dtype=np.uint8) * 255
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 2
+        font_thickness = 2
+        text_lines = ["Generative Mosaic Art - Made with Code", f"Mosaics created from {str(source_piece_num)} images, each {str(n_row)}x{str(n_col)} pixels"]
+        line_height = max(cv2.getTextSize("A", font, font_scale, font_thickness)[0][1], 10)  # Get the height of the text
+        for i, text_line in enumerate(text_lines):
+            text_size = cv2.getTextSize(text_line, font, font_scale, font_thickness)[0]
+            text_position = ((CANVAS_PIX - text_size[0]) // 2, int((CANVAS_PIX - len(text_lines) * line_height) / 2) + (i + 1) * (line_height+25))
+            text_color = (0, 0, 0) #black
+            cv2.putText(image_char, text_line, text_position, font, font_scale, text_color, font_thickness)
+        for _ in range(48):# Repeat for 48 frames to pause the video
+            video_output.write(image_char)
 
     for idx, image in enumerate(image_list):
         if idx % n_col == 0:
@@ -317,7 +331,7 @@ def mosaic(input_dir, target_image_path, mode="LAB2", n_div=110, piece_scale=1/4
 
 if __name__ == '__main__':
     input_dir = "./" ### モザイクアートに使う写真が格納されているディレクトリを指定
-    target_image_path = "./ColorChecker_All_S-Gamut3.Cine_D50_BT709.png" ### モザイクアートで作りたい画像のパスを指定
+    target_image_path = "./02801-3577570334.png" ### モザイクアートで作りたい画像のパスを指定
 
     mode = "LAB" ### 利用する比較モードを指定
     n_div = 63 ### 作りたい画像の各辺を何分割するかを指定(n_div * n_div枚をモザイクアートで使うことになる)

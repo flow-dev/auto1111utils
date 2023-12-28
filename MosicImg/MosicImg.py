@@ -23,8 +23,29 @@ from datetime import datetime
 HEIGHT = 512
 WIDTH  = 512
 
-# 最終出力のキャンバスサイズ(正方形)
+# 最終出力のキャンバスサイズ(正方形のみ)
 CANVAS_PIX = 2160
+
+
+# 画像の中央を切り出す
+def crop_image_center(image):
+
+    if (image is None):
+        return np.inf
+    
+    height = int(image.shape[0])
+    width = int(image.shape[1])
+
+    # 正方形でない場合は中央をCropする
+    if(width != height):
+        min_dim = min(width, height)
+        left = (width - min_dim) // 2
+        top = (height - min_dim) // 2
+        right = (width + min_dim) // 2
+        bottom = (height + min_dim) // 2
+        image = image[top:bottom, left:right]
+
+    return (image)
 
 
 # 画像を調整しながら読み込み
@@ -32,18 +53,8 @@ def load_images(image_path, scale=1.0):
 
     image = cv2.imread(image_path)
 
-    height = int(image.shape[0])
-    width = int(image.shape[1])
-
     # 正方形でない場合は中央をCropする
-    if(width != height):
-        min_dim = min(width, height)
-        print("Crop the image from center=", image_path)
-        left = (width - min_dim) // 2
-        top = (height - min_dim) // 2
-        right = (width + min_dim) // 2
-        bottom = (height + min_dim) // 2
-        image = image[top:bottom, left:right]
+    image = crop_image_center(image)
 
     # タイル画像の基準とする画像サイズにリサイズする
     image = cv2.resize(image, (int(WIDTH*scale), int(HEIGHT*scale)), interpolation=cv2.INTER_AREA)
@@ -52,6 +63,7 @@ def load_images(image_path, scale=1.0):
 
 # 画像を分割する
 def divide_image(img, n_row=4, n_col=4):
+
     height, width, _ = np.shape(img)
     divide_list = [[img[int(row_ind * (height / n_row)) : int((row_ind + 1) * (height /n_row)), 
                                     int(col_ind *(width / n_col)) : int((col_ind + 1) * (width  / n_col)), :]
@@ -86,26 +98,18 @@ def diff_score_hsv(img1, img2, color_coef=np.array([1, 1, 1])):
 # 画像を調整しながら表示
 def show_img(img):
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    # plt.imshow(img_rgb)#, cmap = 'gray')
-    # #plt.colorbar()
-    # plt.show()
+    plt.imshow(img_rgb)#, cmap = 'gray')
+    #plt.colorbar()
+    plt.show()
 
 
 def paste_image_on_canvas(canvas_size, paste_image):
 
     canvas = np.ones((canvas_size[1], canvas_size[0], 3), dtype=np.uint8) * 255
 
-
     # 正方形でない場合は中央をCropする
-    height = int(paste_image.shape[0])
-    width = int(paste_image.shape[1])
-    if(width != height):
-        min_dim = min(width, height)
-        left = (width - min_dim) // 2
-        top = (height - min_dim) // 2
-        right = (width + min_dim) // 2
-        bottom = (height + min_dim) // 2
-        paste_image = paste_image[top:bottom, left:right]
+    paste_image = crop_image_center(paste_image)
+
     paste_image = cv2.resize(paste_image, (int(canvas_size[1]), int(canvas_size[0])))
 
     # 画像がキャンバスより小さい場合の余白計算
@@ -138,7 +142,7 @@ def concat_tile_image(image_list, target_image_path, source_piece_num, n_row=10,
         fps = int(math.ceil(len(image_list) / 5))
         # Ensure fps is within the specified range [1, 24]
         fps = max(1, min(24, fps))
-        print("fps=",fps)
+        # print("fps=",fps)
         video_output = cv2.VideoWriter(output_file, fourcc, fps, (CANVAS_PIX, CANVAS_PIX))
         # Display text on the first frame
         image_char = np.ones((CANVAS_PIX, CANVAS_PIX, 3), dtype=np.uint8) * 255
@@ -155,7 +159,8 @@ def concat_tile_image(image_list, target_image_path, source_piece_num, n_row=10,
         for _ in range(48):# Repeat for 48 frames to pause the video
             video_output.write(image_char)
 
-    for idx, image in enumerate(image_list):
+    for idx, image in tqdm(enumerate(image_list), total=len(image_list), desc="[Concat tile images]"):
+
         if idx % n_col == 0:
             row_list = [image]
             #show_img(np.hstack(row_list)) #左端のタイル
@@ -178,7 +183,7 @@ def concat_tile_image(image_list, target_image_path, source_piece_num, n_row=10,
                     # 偶数のみフレーム書き出しで拡大表示時の端画像をきれいにする
                     # 5x5ブロックから表示する制約を入れる。3x3までは拡大のジャギーが目立つため
                     if((idx % 2 == 0) & (idx >= ((n_col * 5)-1))):
-                        print("Write Video Frame idx:",idx,n_col)
+                        #print("Write Video Frame idx:",idx,n_col)
                         frame = paste_image_on_canvas(canvas_size, np.vstack(concat_list))
                         for _ in range(7):#7フレーム繰り返し書いて映像を止める
                             video_output.write(frame)
@@ -195,7 +200,6 @@ def concat_tile_image(image_list, target_image_path, source_piece_num, n_row=10,
     concat_img = np.vstack(concat_list)
     
     if create_video:
-        print("Write Last Video Frame idx:",idx)
 
         # #白画像を挟んでフラッシュ効果を表示
         # canvas = np.ones((canvas_size[1], canvas_size[0], 3), dtype=np.uint8) * 255
@@ -203,31 +207,21 @@ def concat_tile_image(image_list, target_image_path, source_piece_num, n_row=10,
         # for _ in range(6):#6フレーム繰り返し書いて映像を止める
         #     video_output.write(frame)
 
-        #完成したモザイク画像を動画に表示
+        "完成したモザイク画像を動画に表示"
         frame = paste_image_on_canvas(canvas_size, concat_img)
         for _ in range(96):#96フレーム繰り返し書いて映像を止める
             video_output.write(frame)
         
-        #モザイク前の目標画像を動画に表示
+        "モザイク前の目標画像を動画に表示"
         target_image = cv2.imread(target_image_path)
-        height = int(target_image.shape[0])
-        width = int(target_image.shape[1])
+
         # 正方形でない場合は中央をCropする
-        if(width != height):
-            min_dim = min(width, height)
-            print("Crop the target image from center=", target_image_path)
-            left = (width - min_dim) // 2
-            top = (height - min_dim) // 2
-            right = (width + min_dim) // 2
-            bottom = (height + min_dim) // 2
-            target_image = target_image[top:bottom, left:right]
+        target_image = crop_image_center(target_image)
+
         target_image = cv2.resize(target_image, (concat_img.shape[1], concat_img.shape[0]))
         frame = paste_image_on_canvas(canvas_size, target_image)
         for _ in range(72):#72フレーム繰り返し書いて映像を止める
             video_output.write(frame)
-
-    # 画像を表示
-    show_img(concat_img)
 
     # 画像を保存する
     resized_image = cv2.resize(concat_img, (CANVAS_PIX, CANVAS_PIX))
@@ -237,7 +231,12 @@ def concat_tile_image(image_list, target_image_path, source_piece_num, n_row=10,
     # Release the video writer if create_video is True
     if create_video:
         video_output.release()
-    
+
+    print("Finish Generate Image & Video")
+
+    # 画像を表示
+    # show_img(concat_img)
+
     return
 
 def mosaic(input_dir, target_image_path, mode="LAB2", n_div=110, piece_scale=1/40):
@@ -260,18 +259,9 @@ def mosaic(input_dir, target_image_path, mode="LAB2", n_div=110, piece_scale=1/4
     
     "[2] 目的の画像を読み込み"
     target_image = cv2.imread(target_image_path)
-    height = int(target_image.shape[0])
-    width = int(target_image.shape[1])
 
     # 正方形でない場合は中央をCropする
-    if(width != height):
-        min_dim = min(width, height)
-        print("Crop the image from center=", target_image_path)
-        left = (width - min_dim) // 2
-        top = (height - min_dim) // 2
-        right = (width + min_dim) // 2
-        bottom = (height + min_dim) // 2
-        target_image = target_image[top:bottom, left:right]
+    target_image = crop_image_center(target_image)
 
     "[3] 目的の画像を分割"
     target_piece_list = divide_image(target_image, n_col=n_col, n_row=n_row)
@@ -331,7 +321,7 @@ def mosaic(input_dir, target_image_path, mode="LAB2", n_div=110, piece_scale=1/4
 
 if __name__ == '__main__':
     input_dir = "./" ### モザイクアートに使う写真が格納されているディレクトリを指定
-    target_image_path = "./02801-3577570334.png" ### モザイクアートで作りたい画像のパスを指定
+    target_image_path = "./Face_IMG.png" ### モザイクアートで作りたい画像のパスを指定
 
     mode = "LAB" ### 利用する比較モードを指定
     n_div = 63 ### 作りたい画像の各辺を何分割するかを指定(n_div * n_div枚をモザイクアートで使うことになる)

@@ -6,7 +6,7 @@ Python script (`MakeGridImg.py`) for creating a grid image from a collection of 
 
 This script reads all PNG files in the current directory, resizes them to a fixed size, and arranges them in a grid pattern. The resulting grid image is saved as a JPEG file.
 
-![output_grid_20231224170944_9_images.jpg](output_grid_20231224170944_9_images.jpg)
+![output_grid_20231229135804_9_images.jpg](output_grid_20231229135804_9_images.jpg)
 
 ## Usage
 

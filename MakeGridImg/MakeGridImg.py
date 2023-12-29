@@ -16,6 +16,7 @@ from datetime import datetime
 import random
 import cv2
 import math
+from tqdm import tqdm
 
 def create_image_grid(sorted_flag=False, random_flag=True, create_video=True):
 
@@ -50,24 +51,38 @@ def create_image_grid(sorted_flag=False, random_flag=True, create_video=True):
     # init grid canvas
     grid_image = np.ones((grid_size * 512, grid_size * 512, 3), dtype=np.uint8) * 255
 
+    # Get timestamp
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+
     # Define video writer if create_video is True
     if create_video:
-        output_file = "grid_generation_process.mov"  # 保存する動画ファイル名
+        output_file = f"grid_process_{timestamp}_{str(num_images)}_tiles.mov" # Video file name for saving
         fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
-        fps = int(math.ceil(num_images / 5))
-        # Ensure fps is within the specified range [1, 24]
-        fps = max(1, min(24, fps))
+        fps = 24
         print("fps=",fps)
         video_output = cv2.VideoWriter(output_file, fourcc, fps, (1080, 1080))
+        # Display text on the first frame
+        image_char = np.ones((1080, 1080, 3), dtype=np.uint8) * 255
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 1
+        font_thickness = 2
+        text_lines = ["Generative Grid Images - Made with Code", f"{str(num_images)} images, each {str(grid_size)}x{str(grid_size)} pixels"]
+        line_height = max(cv2.getTextSize("A", font, font_scale, font_thickness)[0][1], 10)  # Get the height of the text
+        for i, text_line in enumerate(text_lines):
+            text_size = cv2.getTextSize(text_line, font, font_scale, font_thickness)[0]
+            text_position = ((1080 - text_size[0]) // 2, int((1080 - len(text_lines) * line_height) / 2) + (i + 1) * (line_height+25))
+            text_color = (0, 0, 0) #black
+            cv2.putText(image_char, text_line, text_position, font, font_scale, text_color, font_thickness)
+        for _ in range((fps*2)):# Repeat for 48 frames to pause the video
+            video_output.write(image_char)
 
     # put the images on the grid canvas
-    for i, image_path in enumerate(image_files):
+    for i, image_path in tqdm(enumerate(image_files), desc="[Put Grid Images]"):
         img = Image.open(image_path)
         img = img.convert("RGB")
         width, height = img.size
         min_dim = min(width, height)
         if(width != height):
-            print("Crop the image from center=",i, image_path)
             left = (width - min_dim) // 2
             top = (height - min_dim) // 2
             right = (width + min_dim) // 2
@@ -87,7 +102,8 @@ def create_image_grid(sorted_flag=False, random_flag=True, create_video=True):
             # output_image = Image.fromarray(frame)
             # process_path = f"output_{str(i)}_images.jpg"
             # output_image.save(process_path)
-            video_output.write(frame)
+            for _ in range(int(fps/4)):# Repeat for 48 frames to pause the video
+                video_output.write(frame)
 
     # Get timestamp
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")

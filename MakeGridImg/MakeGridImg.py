@@ -102,7 +102,7 @@ def create_image_grid(sorted_flag=False, random_flag=True, create_video=True):
             # output_image = Image.fromarray(frame)
             # process_path = f"output_{str(i)}_images.jpg"
             # output_image.save(process_path)
-            for _ in range(int(fps/4)):# Repeat for 48 frames to pause the video
+            for _ in range(int(fps/7)):# Repeat for 48 frames to pause the video
                 video_output.write(frame)
 
     # Get timestamp

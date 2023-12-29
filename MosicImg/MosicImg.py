@@ -18,6 +18,14 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import math
 from datetime import datetime
+import argparse
+import glob
+
+# --------------- Arguments ---------------
+
+parser = argparse.ArgumentParser(description='MosicImg')
+parser.add_argument('--img', type=str, required=True, help="Set target image path")
+args = parser.parse_args()
 
 # タイル画像の基準とする画像サイズ
 HEIGHT = 512
@@ -319,12 +327,26 @@ def mosaic(input_dir, target_image_path, mode="LAB2", n_div=110, piece_scale=1/4
     # 並べ替えたピースを一つの画像にくっつけて表示
     concat_tile_image(mosaic_list_sorted, target_image_path, source_piece_num, n_col=n_col, n_row=n_row, scale=piece_scale)
 
+
+def process_images_in_directory(input_dir, target_image_path, mode, n_div, piece_scale):
+    # 指定されたディレクトリ内のすべてのPNGファイルを取得
+    file_list = glob.glob(os.path.join(target_image_path, '*.png'))
+
+    # 各ファイルに対してモザイク処理を行う
+    for file_path in file_list:
+        mosaic(input_dir, file_path, mode=mode, n_div=n_div, piece_scale=piece_scale)
+
 if __name__ == '__main__':
     input_dir = "./" ### モザイクアートに使う写真が格納されているディレクトリを指定
-    target_image_path = "./00030-3053354251.png" ### モザイクアートで作りたい画像のパスを指定
+    #target_image_path = "./00030-3053354251.png" ### モザイクアートで作りたい画像のパスを指定
 
     mode = "LAB" ### 利用する比較モードを指定
     n_div = 63 ### 作りたい画像の各辺を何分割するかを指定(n_div * n_div枚をモザイクアートで使うことになる)
     piece_scale = 1 / 15 ### モザイクアートに並べる画像のサイズの倍率を指定
 
-    mosaic(input_dir, target_image_path, mode=mode, n_div=n_div, piece_scale=piece_scale)
+    # args.img が拡張子を含んでいる場合は mosaic() の処理を行う
+    _, ext = os.path.splitext(args.img)
+    if ext:
+        mosaic(input_dir, args.img, mode=mode, n_div=n_div, piece_scale=piece_scale)
+    else:
+        process_images_in_directory(input_dir, args.img, mode, n_div, piece_scale)

@@ -333,7 +333,8 @@ def process_images_in_directory(input_dir, target_image_path, mode, n_div, piece
     file_list = glob.glob(os.path.join(target_image_path, '*.png'))
 
     # 各ファイルに対してモザイク処理を行う
-    for file_path in file_list:
+    for file_path in tqdm(file_list, desc="[Load file_list]"):
+        print("target_image_path=", file_path)
         mosaic(input_dir, file_path, mode=mode, n_div=n_div, piece_scale=piece_scale)
 
 if __name__ == '__main__':

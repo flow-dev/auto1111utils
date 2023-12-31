@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Set the paths for the input and output folders
-input_folder="/stable-diffusion-webui/outputs/car_mosaic"
-output_folder="/stable-diffusion-webui/outputs/auto_mosaic"
+input_folder="/stable-diffusion-webui/outputs/MosaicArt/camera_mosaic"
+output_folder="/table-diffusion-webui/outputs/MosaicArt/target_images"
 
 # Create the output folder if it doesn't exist
 mkdir -p "$output_folder"
@@ -18,4 +18,7 @@ for mov_file in "$input_folder"/*.mov; do
     ffmpeg -i "$mov_file" -vf "scale=1080:1080" "$output_path"
 done
 
-echo "Resizing completed."
+# Move all jpg files from jpg_input_folder to jpg_output_folder
+mv "$input_folder"/*.jpg "$output_folder/"
+
+echo "Resizing and Move all jpg files completed."

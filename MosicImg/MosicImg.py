@@ -20,6 +20,7 @@ import math
 from datetime import datetime
 import argparse
 import glob
+#import color_transfer_MKL as ct
 
 # --------------- Arguments ---------------
 
@@ -33,6 +34,42 @@ WIDTH  = 512
 
 # 最終出力のキャンバスサイズ(正方形のみ)
 CANVAS_PIX = 2160
+
+EPS = 2.2204e-16
+
+def color_transfer_MKL(source, target):
+  assert len(source.shape) == 3, 'Images should have 3 dimensions'
+  assert source.shape[-1] == 3, 'Images should have 3 channels'
+  X0 = np.reshape(source, (-1, 3), 'F')
+  X1 = np.reshape(target, (-1, 3), 'F')
+  A = np.cov(X0, rowvar=False)
+  B = np.cov(X1, rowvar=False)
+  T = MKL(A, B)
+  mX0 = np.mean(X0, axis=0)
+  mX1 = np.mean(X1, axis=0)
+  XR = (X0 - mX0) @ T + mX1
+  IR = np.reshape(XR, source.shape, 'F')
+  IR = np.real(IR)
+  IR[IR > 1] = 1
+  IR[IR < 0] = 0
+  return IR
+
+
+def MKL(A, B):
+  Da2, Ua = np.linalg.eig(A)
+
+  Da2 = np.diag(Da2)
+  Da2[Da2 < 0] = 0
+  Da = np.sqrt(Da2 + EPS)
+  C = Da @ np.transpose(Ua) @ B @ Ua @ Da
+  Dc2, Uc = np.linalg.eig(C)
+
+  Dc2 = np.diag(Dc2)
+  Dc2[Dc2 < 0] = 0
+  Dc = np.sqrt(Dc2 + EPS)
+  Da_inv = np.diag(1 / (np.diag(Da)))
+  T = Ua @ Da_inv @ Uc @ Dc @ np.transpose(Uc) @ Da_inv @ np.transpose(Ua)
+  return T
 
 
 # 画像の中央を切り出す
@@ -130,8 +167,17 @@ def paste_image_on_canvas(canvas_size, paste_image):
     return canvas
 
 
+def transfer_mkl(source,target):
+    #Monge-Kantorovich solutionで目標画像に色を合わせる
+    source = source/255
+    target = target/255
+    result = color_transfer_MKL(source, target)
+    result = (np.uint8(result * 255))
+    return result
+
+
 # 画像群をくっつけて表示
-def concat_tile_image(image_list, target_image_path, source_piece_num, n_row=10, n_col=10, scale=1.0, create_video=True):
+def concat_tile_image(image_list, target_image_path, source_piece_num, n_row=10, n_col=10, scale=1.0, create_video=True, do_mkl=True):
 
     height = int(HEIGHT * scale)
     width = int(WIDTH * scale)
@@ -142,6 +188,10 @@ def concat_tile_image(image_list, target_image_path, source_piece_num, n_row=10,
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     # Target Image Filename
     target_img_filename, extension = os.path.splitext(os.path.basename(target_image_path))
+    
+    target_image = cv2.imread(target_image_path)
+    # 正方形でない場合は中央をCropする
+    target_image = crop_image_center(target_image)
     
     # Define video writer if create_video is True
     if create_video:
@@ -164,7 +214,7 @@ def concat_tile_image(image_list, target_image_path, source_piece_num, n_row=10,
             text_position = ((CANVAS_PIX - text_size[0]) // 2, int((CANVAS_PIX - len(text_lines) * line_height) / 2) + (i + 1) * (line_height+25))
             text_color = (0, 0, 0) #black
             cv2.putText(image_char, text_line, text_position, font, font_scale, text_color, font_thickness)
-        for _ in range(48):# Repeat for 48 frames to pause the video
+        for _ in range(fps*2):# Repeat for fps*2 frames to pause the video
             video_output.write(image_char)
 
     for idx, image in tqdm(enumerate(image_list), total=len(image_list), desc="[Concat tile images]"):
@@ -193,7 +243,10 @@ def concat_tile_image(image_list, target_image_path, source_piece_num, n_row=10,
                     if((idx % 2 == 0) & (idx >= ((n_col * 5)-1))):
                         #print("Write Video Frame idx:",idx,n_col)
                         frame = paste_image_on_canvas(canvas_size, np.vstack(concat_list))
-                        for _ in range(7):#7フレーム繰り返し書いて映像を止める
+                        if(do_mkl):
+                            #Monge-Kantorovich solutionで目標画像に色を合わせる
+                            frame = transfer_mkl(frame,target_image)
+                        for _ in range(int(fps/4)):#int(fps/4)フレーム繰り返し書いて映像を止める
                             video_output.write(frame)
         if idx == len(image_list) - 1:
             if idx % n_col < n_col -1:
@@ -217,22 +270,23 @@ def concat_tile_image(image_list, target_image_path, source_piece_num, n_row=10,
 
         "完成したモザイク画像を動画に表示"
         frame = paste_image_on_canvas(canvas_size, concat_img)
-        for _ in range(96):#96フレーム繰り返し書いて映像を止める
+        if(do_mkl):
+            #Monge-Kantorovich solutionで目標画像に色を合わせる
+            frame = transfer_mkl(frame,target_image)
+        for _ in range(fps*4):#fps*4フレーム繰り返し書いて映像を止める
             video_output.write(frame)
-        
+
         "モザイク前の目標画像を動画に表示"
-        target_image = cv2.imread(target_image_path)
-
-        # 正方形でない場合は中央をCropする
-        target_image = crop_image_center(target_image)
-
         target_image = cv2.resize(target_image, (concat_img.shape[1], concat_img.shape[0]))
         frame = paste_image_on_canvas(canvas_size, target_image)
-        for _ in range(72):#72フレーム繰り返し書いて映像を止める
+        for _ in range(fps*3):#fps*3フレーム繰り返し書いて映像を止める
             video_output.write(frame)
 
     # 画像を保存する
     resized_image = cv2.resize(concat_img, (CANVAS_PIX, CANVAS_PIX))
+    if(do_mkl):
+        #Monge-Kantorovich solutionで目標画像に色を合わせる
+        resized_image = transfer_mkl(resized_image,target_image)
     concat_img_name = f"concat_img_{timestamp}_{target_img_filename}_{str(source_piece_num)}_tiles.jpg"
     cv2.imwrite(concat_img_name, resized_image)
 
